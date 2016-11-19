@@ -15,6 +15,8 @@ import Control.Monad   (join)
 import Control.Compose ((:.)(..))
 
 
+-- | A data type to abstract over how one has to work with loeb to make things
+-- work the way one would want them to.
 data SheetElem ix a
     = Item a
     | At ix
@@ -25,7 +27,8 @@ data SheetElem ix a
     | Fn5 (a -> a -> a -> a -> a -> a) (SheetElem ix a) (SheetElem ix a) (SheetElem ix a) (SheetElem ix a) (SheetElem ix a)
     | Fn6 (a -> a -> a -> a -> a -> a -> a) (SheetElem ix a) (SheetElem ix a) (SheetElem ix a) (SheetElem ix a) (SheetElem ix a) (SheetElem ix a)
 
-
+-- | Num definition for SheetElem to make composing 2 numbers inside a sheet
+-- much easier.
 instance (Num a) => Num (SheetElem ix a) where
     (+) = Fn2 (+)
     (-) = Fn2 (-)
@@ -35,22 +38,29 @@ instance (Num a) => Num (SheetElem ix a) where
     signum = Fn1 signum
     fromInteger = Item . fromInteger
 
+-- | Same as Num.
 instance (Fractional a) => Fractional (SheetElem ix a) where
     (/) = Fn2 (/)
     recip = Fn1 recip
     fromRational = Item . fromRational
 
 
+-- | Typeclass that ensures that an applicative f along with the index
+-- can be used in creating a LoebSheet
 class (Applicative f) => LoebSheet index f | f -> index where
     sheetAt :: f a -> index -> Maybe a
 
 
+-- | A simple instance of LoebSheet for []
 instance LoebSheet Int [] where
     sheetAt []     _ = Nothing
     sheetAt (x:_)  0 = Just x
     sheetAt (_:xs) n = xs `sheetAt` (n-1)
     
 
+-- | Recursive instance of LoebSheet that allows us to compose multiple 
+-- LoebSheets together. Also allows us to make nD sheets by composing the
+-- same LoebSheet on itself. E.g. pythagorasTringle in Examples
 instance (LoebSheet index1 f, LoebSheet index2 g) 
          => LoebSheet (index1, index2) (f :. g) where
     sheetAt :: (f :. g) a -> (index1, index2) -> Maybe a
@@ -58,11 +68,13 @@ instance (LoebSheet index1 f, LoebSheet index2 g)
         = join $ fmap (`sheetAt` n2) (x `sheetAt` n1)
 
 
+-- | Evaluates the elements in LoebSheet into values.
 eval :: (LoebSheet index f)
      => f (SheetElem index a) -> f (Maybe a)
 eval = loeb . fmap translate
 
 
+-- | The meat of the whole thing. "Magical" function loeb.
 loeb :: Functor f
      => f (f a -> a) -> f a
 loeb x = go
@@ -70,6 +82,7 @@ loeb x = go
     go = fmap ($ go) x
 
 
+-- | Translates a SheetElem into the form required by loeb.
 translate :: (LoebSheet index f)
           => SheetElem index a -> (f (Maybe a) -> Maybe a)
 translate (Item x) table

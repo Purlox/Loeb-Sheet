@@ -64,5 +64,6 @@ sheetIO1 = eval
     ]
 
 
+-- | Runs the IOs inside [Maybe (IO a)]
 runSheetIO :: [Maybe (IO a)] -> IO ()
 runSheetIO sheet = sequence_ $ fmap sequence_ sheet
